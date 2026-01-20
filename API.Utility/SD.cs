@@ -2,6 +2,11 @@
 {
     public static class SD
     {
+        //Application claims
+        public const string UserId = "uid";
+        public const string UserName = "username";
+        public const string Email = "email"; 
+
         //regex
         public const string UserNameRegex = "^[]a-zA-z0-9_.-]*$";
         public const string EmailRegex = "^.+@[^\\.].*\\.[a-z]{2,}$";

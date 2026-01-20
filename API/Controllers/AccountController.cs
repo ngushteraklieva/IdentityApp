@@ -1,5 +1,6 @@
 ﻿using API.DTOs.Account;
 using API.Models;
+using API.Services.IServices;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,15 +17,19 @@ namespace API.Controllers
         //Inside this controller, I want to store a tool called UserManager<AppUser>
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
+        private readonly ITokenService _tokenService;
 
         //Constructor Injection
         //When this controller is created, ASP.NET: please give me a UserManager
         //the standard way ASP.NET gives services to your controllers
         //UserManager<AppUser> - A built-in Identity service for managing users
-        public AccountController(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager)
+        public AccountController(UserManager<AppUser> userManager, 
+            SignInManager<AppUser> signInManager,
+            ITokenService tokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _tokenService = tokenService;
         }
 
 
@@ -88,7 +93,12 @@ namespace API.Controllers
         #region Private Methods
         private AppUserDto CreateAppUserDto(AppUser user)
         {
-            string jwt = _tokenServce.CreateJWT(user);
+            string jwt = _tokenService.CreateJWT(user);
+            SetJWTCookie(jwt);
+        }
+        private void SetJWTCookie(string jwt)
+        {
+
         }
         //Here _userManager comes from the constructor.
         private async Task<bool> CheckEmailExistsAsync(string email)
