@@ -18,7 +18,7 @@ namespace API.Data
         {
             base.OnModelCreating(builder);
 
-            builder.Entity<AppUser>().HasMany(ur => ur.Roles).WithOne(u => u.User).HasForeignKey(u => u.UserId).isRequired();
+            builder.Entity<AppUser>().HasMany(ur => ur.Roles).WithOne(u => u.User).HasForeignKey(u => u.UserId).IsRequired();
             builder.Entity<AppRole>().HasMany(ur => ur.Users).WithOne(u => u.Role).HasForeignKey(u => u.RoleId).IsRequired();
 
         }
