@@ -1,0 +1,320 @@
+﻿1.AuthController:
+using JWTAuth.Entities;
+using JWTAuth.Models;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+
+namespace JWTAuth.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class AuthController : ControllerBase
+    {
+        //This creates a temporary storage for one user in the server's memory.
+        //Note: In a real app, this would be a Database, not a static variable.
+        public static User user = new();
+
+        [HttpPost("register")]
+
+        public ActionResult<User> Register(UserDto request)
+        {
+            //new PasswordHasher<User>(): This creates a "blender."
+            //.HashPassword(user, request.Password): This is the actual blending. It takes the plain password
+            //(e.g., "MySecret123") and turns it into something like AQAAAAEAACcQAAAA....
+            var hashedPassword = new PasswordHasher<User>()
+                .HashPassword(user, request.Password);
+
+            user.Username = request.Username;
+            //user.PasswordHash = hashedPassword: Instead of saving the real password,
+            //you save the scrambled mess.
+            user.PasswordHash = hashedPassword;
+
+            return Ok(user);
+        }
+    }
+}
+
+
+2. AuthService and IAuthService:
+It feels like extra work now, but this "interface-first" pattern is the secret to building professional, scalable apps. 
+In the industry, we call this the Dependency Inversion Principle.
+When your Controller asks for IAuthService, it doesn't care how the service works, only that it has a login method.
+Today: You use AuthService with a SQL database.
+Tomorrow: You decide to switch to Google Login or Azure AD.
+The Benefit: You just create a NewAuthService : IAuthService, 
+swap one line in Program.cs, and you don't have to touch a single line of code in your Controllers.
+
+3.In professional development, you should consider creating a DTO the moment data leaves or enters your API.
+Think of it as a "security checkpoint": never let your raw database tables (Entities) talk directly to the outside world.
+Here are the four specific moments you should create one:
+3.1. When receiving "Input" (The Request)
+As you saw with your UserDto, you need a DTO when the user provides data that doesn't perfectly match your database.
+Example: Your User entity has a PasswordHash (scrambled), but the user sends a Password (plain text). You need a DTO to catch that plain text before you hash it.
+3.2. When hiding "Secrets" (The Response)
+Never send your entire database row back to the frontend.
+Example: If you have a GetUsers endpoint, your User entity likely has a PasswordHash and a SecurityStamp.
+Action: Create a UserResponseDto that only contains Username and Email. This ensures you don't accidentally leak password data to a hacker using "Inspect Element."
+3.3. When "Flattening" data (The View)
+If your database is complex with many relationships, the frontend might just want a simple summary.
+Example: A Post entity has an Author entity, which has a Profile entity.
+Action: Create a BlogPostDto that just has Title, Body, and AuthorName (a single string) instead of three nested objects.
+3.4. When "Filtering" (The Edit)
+When a user updates their profile, they shouldn't be allowed to change everything (like their AccountCreatedDate or AdminStatus).
+Example: Create an UpdateProfileDto that only contains Bio and ProfilePictureUrl. Even if a user tries to send an IsAdmin: true field in the JSON, your DTO will simply ignore it because it doesn't have that property.
+
+4.In C#, the PasswordHasher<TUser> is a generic class. The <User> part is called a Type Parameter, and it is required for two main reasons:
+1. It acts as a "Salt Binder"
+The PasswordHasher is designed to work specifically with your user model. Even though the hasher mostly looks at the strings, it technically "binds" the hashing logic to your specific User class. This is a safety feature in ASP.NET Core Identity to ensure that a password hash meant for a User object isn't accidentally validated against a Customer or Admin object.
+2. Method Signatures
+If you look at the official Microsoft documentation for PasswordHasher, you’ll see the methods look like this:
+HashPassword(TUser user, string password)
+VerifyHashedPassword(TUser user, ...)
+Because the methods require an instance of the user as the first argument, the compiler needs to know what "Type" that user is. By writing PasswordHasher<User>, you are telling C#:
+"I am going to pass a User object into these methods, so prepare the code to accept that specific class."
+It’s like a specialized Identity Guard: you have to tell the guard if he is guarding a User, an Employee, or a Member.
+
+5.builder.Services.AddScoped<IAuthService, AuthService>();
+1. The Relationship: "IAuthService ? AuthService"
+IAuthService: This is the Service Type (the "Job Description").
+AuthService: This is the Implementation Type (the "Person" who does the job).
+By registering them together, you are saying: "Every time the app sees an IAuthService label, please hire an AuthService to do the work."
+2. What does "Scoped" mean?
+This defines the lifetime of the object. There are three main ways to register a service:
+AddScoped: A new AuthService is created once per HTTP request. If your login process hits three different methods, they all share the same instance of the service for that one click. When the user gets their response, the object is destroyed. This is the gold standard for database-related services.
+
+6.Mental model (easy to remember)
+Cookie = envelope
+JWT = ID card inside the envelope
+Browser = mailman
+Server = security guard
+
+Rule: If JS can read it, it can be stolen.
+HttpOnly cookies protect JWTs by making them inaccessible to JavaScript, 
+which prevents token theft via XSS attacks.
+cookie not readable by JS
+cookie not readable on the network
+
+Modern auth is about hiding tokens from JavaScript, limiting where cookies can travel, 
+and letting the browser enforce security rules.
+Login → server sets HttpOnly cookies (access + refresh token)
+Normal request → browser sends cookies automatically → server validates access token
+Access token expired → browser sends refresh token cookie → server issues new access token
+Logout → server clears cookies
+Extra protections:
+CSRF tokens on unsafe requests (POST, PUT, DELETE)
+SameSite=Lax to block cross-site request forgery
+HTTPS to encrypt everything in transit
+
+Cookies
+├─ By lifespan
+│   ├─ Session (expires on close)
+│   └─ Persistent (expires later)
+├─ By access
+│   ├─ HttpOnly (JS can't read)
+│   └─ Non-HttpOnly (JS can read)
+└─ By cross-site rules
+    ├─ SameSite=Strict
+    ├─ SameSite=Lax
+    └─ SameSite=None
+
+
+7.Access token and Refresh token
+Flow:
+You log in → server issues:
+
+Set-Cookie: access_token=SHORT_LIVED_JWT (e.g., 15 min)
+Set-Cookie: refresh_token=LONG_LIVED_JWT (e.g., 7 days)
+
+You make requests → access token is used automatically from cookie
+Access token expires → server responds 401
+Browser sends refresh request with refresh token
+Server validates refresh token → issues new access token (short-lived again)
+✅ So yes: every new access token is always short-lived, refresh token keeps your session alive without logging in again.
+
+┌───────────────┐
+│   User logs in │
+└───────┬───────┘
+        │
+        ▼
+┌─────────────────────────────┐
+│ Server issues cookies:      │
+│                             │
+│ access_token  (short-lived) │ HttpOnly, session/persistent
+│ refresh_token (long-lived)  │ HttpOnly, persistent
+│ preference cookies          │ Non-HttpOnly, JS-accessible
+└─────────────┬──────────────┘
+              │
+              ▼
+   ┌─────────────────────┐
+   │ Browser stores cookies│
+   └─────────┬───────────┘
+             │
+             ▼
+ ┌───────────────────────────┐
+ │ Access token valid?        │
+ ├─Yes───────────────────────┤
+ │ Browser sends access_token │
+ │ with API requests          │
+ │ Server validates → success │
+ └─────────┬─────────────────┘
+           │
+           ▼
+ ┌───────────────────────────┐
+ │ Access token expired?      │
+ ├─Yes───────────────────────┤
+ │ Browser sends refresh_token│
+ │ (HttpOnly cookie, automatic) │
+ │ Server validates refresh token │
+ └─────────┬─────────────────┘
+           │
+           ▼
+ ┌───────────────────────────┐
+ │ Refresh token valid?       │
+ ├─Yes───────────────────────┤
+ │ Server issues new access_token (short-lived) │
+ │ Browser stores new access_token cookie      │
+ └─────────┬─────────────────┘
+           │
+           ▼
+ ┌───────────────────────────┐
+ │ User continues session     │
+ │ No login required          │
+ └─────────┬─────────────────┘
+           │
+           ▼
+ ┌───────────────────────────┐
+ │ User logs out              │
+ │ Server invalidates refresh │
+ │ token and clears cookies   │
+ └─────────┬─────────────────┘
+           │
+           ▼
+ ┌───────────────────────────┐
+ │ Session ends               │
+ │ Preference cookies remain  │
+ │ (unless manually cleared)  │
+ └───────────────────────────┘
+
+8.What does “HttpOnly + Secure + rotating” mean for refresh tokens?
+Let’s break it down:
+🔹 HttpOnly
+JS cannot access it.
+Stops XSS attacks from stealing it.
+Browser still sends it automatically with requests.
+🔹 Secure
+Sent only over HTTPS, never HTTP.
+Stops network sniffing attacks.
+Very important for long-lived tokens.
+🔹 Rotating
+Each time you use the refresh token to get a new access token, the server issues a new refresh token and invalidates the old one.
+Why rotate?
+If a refresh token is stolen, it becomes useless after it’s used once.
+Limits damage → attacker cannot use an old token to get new access tokens.
+
+Refresh token reuse detection (the missing piece):
+A refresh token should only ever be used once.
+If it’s used twice:
+that means it was copied
+and copying = compromise
+So the safest response is:
+“Kill the entire session.”(login again)
+
+
+9.In short:
+ITokenService exists to define a contract, not to implement logic.
+TokenService implements it with the actual JWT logic.
+Controllers or other services depend on the interface, not the concrete class.
+This makes your app flexible, testable, and maintainable.
+
+
+10.| Step | Action                             | Responsible              |
+| ---- | ---------------------------------- | ------------------------ |
+| 1    | Client sends RegisterDto           | Frontend                 |
+| 2    | AccountController creates user     | Controller + UserManager |
+| 3    | Client sends LoginDto              | Frontend                 |
+| 4    | Controller verifies password       | SignInManager            |
+| 5    | Controller calls TokenService      | TokenService             |
+| 6    | TokenService creates JWT           | TokenService             |
+| 7    | JWT returned to client (or cookie) | Controller               |
+
+
+11. What is UserManager<AppUser>:
+UserManager<TUser> is a built-in service from ASP.NET Core Identity.
+It provides all the basic operations for managing users:
+
+You register Identity in Program.cs, like this:
+
+        builder.Services.AddIdentity<AppUser, IdentityRole>()
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddDefaultTokenProviders();
+
+ASP.NET Core automatically creates UserManager and SignInManager for you.
+You just inject it in your controller:
+
+        public AccountController(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, ITokenService tokenService)
+        {
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _tokenService = tokenService;
+        }
+
+Example:
+
+    var user = new AppUser { UserName = "john", Email = "john@example.com" };
+    var result = await _userManager.CreateAsync(user, "SuperSecret123!");
+    if(result.Succeeded)
+    {
+        // User created successfully
+    }
+    var user = await _userManager.FindByNameAsync("john");
+    bool isCorrect = await _userManager.CheckPasswordAsync(user, "SuperSecret123!");
+
+
+
+| Action                  | UserManager Method                   |
+| ----------------------- | ------------------------------------ |
+| Create a user           | `CreateAsync(user, password)`        |
+| Find a user by ID       | `FindByIdAsync(id)`                  |
+| Find a user by username | `FindByNameAsync(username)`          |
+| Find a user by email    | `FindByEmailAsync(email)`            |
+| Update a user           | `UpdateAsync(user)`                  |
+| Delete a user           | `DeleteAsync(user)`                  |
+| Check password          | `CheckPasswordAsync(user, password)` |
+| Manage roles            | `AddToRoleAsync(user, role)`         |
+
+
+12. The process of user authentication:
+CLIENT (frontend)
+   |
+   | 1️⃣ Sends login request (LoginDto: username + password)
+   v
+ACCOUNT CONTROLLER
+   |
+   | 2️⃣ Finds user in database using UserManager<AppUser>
+   v
+UserManager<AppUser>  ----> DATABASE (AspNetUsers)
+   |                         - Stores AppUser permanently
+   |                         - Password is hashed
+   |
+   | 3️⃣ Validates password using SignInManager
+   v
+SignInManager<AppUser>
+   |
+   | 4️⃣ If password is correct
+   v
+TOKEN SERVICE (ITokenService / TokenService)
+   |
+   | 5️⃣ Generates JWT:
+   |     - Adds claims (UserId, UserName, Email)
+   |     - Signs token with secret key
+   |     - Sets expiration and issuer
+   v
+ACCOUNT CONTROLLER
+   |
+   | 6️⃣ Optionally sets JWT in HTTP-only cookie
+   | 7️⃣ Returns AppUserDto to client (UserName + JWT)
+   v
+CLIENT
+   |
+   | 8️⃣ Stores JWT (localStorage, cookie, or memory)
+   | 9️⃣ Uses JWT in Authorization header for future requests

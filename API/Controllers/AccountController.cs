@@ -1,9 +1,13 @@
 ﻿using API.DTOs.Account;
 using API.Models;
 using API.Services.IServices;
+using API.Utility;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -18,6 +22,7 @@ namespace API.Controllers
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
         private readonly ITokenService _tokenService;
+        private readonly IConfiguration _config;
 
         //Constructor Injection
         //When this controller is created, ASP.NET: please give me a UserManager
@@ -25,11 +30,13 @@ namespace API.Controllers
         //UserManager<AppUser> - A built-in Identity service for managing users
         public AccountController(UserManager<AppUser> userManager, 
             SignInManager<AppUser> signInManager,
-            ITokenService tokenService)
+            ITokenService tokenService,
+            IConfiguration iconfig)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _tokenService = tokenService;
+            _config = iconfig;
         }
 
 
@@ -95,11 +102,31 @@ namespace API.Controllers
         {
             string jwt = _tokenService.CreateJWT(user);
             SetJWTCookie(jwt);
+
+            return new AppUserDto
+            {
+                UserName = user.UserName,
+                JWT = jwt
+            }; 
         }
         private void SetJWTCookie(string jwt)
         {
+            var cookieOptions = new CookieOptions
+            {
+                IsEssential = true,
+                HttpOnly = true,
+                Secure = true,
+                Expires = DateTime.UtcNow.AddDays(int.Parse(_config["JWT:ExpiresInDays"]))
+            };
+            Response.Cookies.Append(SD.IdentityAppCookie, jwt, cookieOptions);
 
         }
+
+        private void RemoveJWTCookie()
+        {
+            Response.Cookies.Delete(SD.IdentityAppCookie);
+        }
+
         //Here _userManager comes from the constructor.
         private async Task<bool> CheckEmailExistsAsync(string email)
         {

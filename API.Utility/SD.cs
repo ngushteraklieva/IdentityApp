@@ -2,6 +2,9 @@
 {
     public static class SD
     {
+        //Cookie
+        public static readonly string IdentityAppCookie = "identityappcookie";    
+
         //Application claims
         public const string UserId = "uid";
         public const string UserName = "username";
