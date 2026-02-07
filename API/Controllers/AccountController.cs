@@ -130,7 +130,8 @@ namespace API.Controllers
                 return Unauthorized();
             }
 
-            return CreateAppUserDto(user);
+            return Ok(CreateAppUserDto(user));
+
         }
 
         #region Private Methods

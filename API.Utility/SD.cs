@@ -18,5 +18,7 @@
         public const int RequiredPasswordLength = 6;
         public const int MaxFailedAccessAttempts = 3;
         public const int DefaultLockoutTimeSpanInDays = 6;
+
+        public const string DefaultPassword = "123456"; 
     }
 }
