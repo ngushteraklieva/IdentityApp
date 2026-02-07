@@ -1,7 +1,9 @@
 ﻿using API.DTOs.Account;
+using API.Extensions;
 using API.Models;
 using API.Services.IServices;
 using API.Utility;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -101,6 +103,34 @@ namespace API.Controllers
             if (!result.Succeeded) return BadRequest(result.Errors);
 
             return Ok("Your account has been created");
+        }
+
+        [Authorize]
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            RemoveJWTCookie();
+            return NoContent();
+        }
+
+
+        //This endpoint revalidates the authenticated user against the database
+        //and issues a fresh JWT cookie to keep the session alive.
+        //The server creates a brand-new JWT with a new expiration time and overwrites the old cookie.
+        [Authorize]
+        [HttpGet("refresh-appuser")]
+        public async Task<ActionResult> RefreshAppUSer()
+        {
+            var user = await _userManager.Users.Where(x => x.Id == User.GetUserId())
+                .FirstOrDefaultAsync();
+
+            if(user == null)
+            {
+                RemoveJWTCookie();
+                return Unauthorized();
+            }
+
+            return CreateAppUserDto(user);
         }
 
         #region Private Methods

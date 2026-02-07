@@ -283,38 +283,37 @@ Example:
 | Manage roles            | `AddToRoleAsync(user, role)`         |
 
 
-12. The process of user authentication:
-CLIENT (frontend)
-   |
-   | 1️⃣ Sends login request (LoginDto: username + password)
-   v
-ACCOUNT CONTROLLER
-   |
-   | 2️⃣ Finds user in database using UserManager<AppUser>
-   v
-UserManager<AppUser>  ----> DATABASE (AspNetUsers)
-   |                         - Stores AppUser permanently
-   |                         - Password is hashed
-   |
-   | 3️⃣ Validates password using SignInManager
-   v
-SignInManager<AppUser>
-   |
-   | 4️⃣ If password is correct
-   v
-TOKEN SERVICE (ITokenService / TokenService)
-   |
-   | 5️⃣ Generates JWT:
-   |     - Adds claims (UserId, UserName, Email)
-   |     - Signs token with secret key
-   |     - Sets expiration and issuer
-   v
-ACCOUNT CONTROLLER
-   |
-   | 6️⃣ Optionally sets JWT in HTTP-only cookie
-   | 7️⃣ Returns AppUserDto to client (UserName + JWT)
-   v
-CLIENT
-   |
-   | 8️⃣ Stores JWT (localStorage, cookie, or memory)
-   | 9️⃣ Uses JWT in Authorization header for future requests
+12. A controller method only needs to be async if it awaits I/O operations like database or network calls; 
+cookie manipulation and identity checks are synchronous.
+I/O = Input / Output
+Any operation where your app waits for something outside of the CPU
+
+Identity / Auth I/O
+await _signInManager.CheckPasswordSignInAsync(...)
+
+Waiting for:
+password hash verification
+possibly DB lookup
+
+Database I/O
+await _userManager.Users.FirstOrDefaultAsync(...)
+
+Waiting for:
+database query
+disk access
+network (DB server)
+
+🌐 Network I/O
+await httpClient.GetAsync("https://api.example.com")
+
+Waiting for:
+another server
+internet latency
+response
+
+📁 File I/O
+await File.ReadAllTextAsync("file.txt")
+
+Waiting for:
+disk read
+OS file system
