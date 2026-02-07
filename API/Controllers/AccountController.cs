@@ -39,6 +39,12 @@ namespace API.Controllers
             _config = iconfig;
         }
 
+        [HttpGet("auth-status")]
+        public IActionResult isLoggedIn()
+        {
+            return Ok(new { isAuthenticated = User.Identity?.IsAuthenticated ?? false });
+        }
+
 
         [HttpPost("login")]
         public async Task<ActionResult<AppUserDto>> Login(LoginDto model)
