@@ -157,7 +157,7 @@ namespace API.Controllers
 
             return new AppUserDto
             {
-                UserName = user.UserName,
+                Name = user.Name,
                 JWT = jwt
             }; 
         }

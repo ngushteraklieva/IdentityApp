@@ -11,6 +11,11 @@ namespace API.Extensions
             return int.TryParse(userIdClaim, out int userId) ? userId : null;
         }
 
+        public static string GetName(this ClaimsPrincipal user)
+        {
+            return user.FindFirst(SD.Name)?.Value;
+        }
+
         public static string GetUserName(this ClaimsPrincipal user)
         {
             return user.FindFirst(SD.UserName)?.Value;

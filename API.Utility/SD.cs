@@ -7,6 +7,7 @@
 
         //Application claims
         public const string UserId = "uid";
+        public const string Name = "name";
         public const string UserName = "username";
         public const string Email = "email"; 
 
