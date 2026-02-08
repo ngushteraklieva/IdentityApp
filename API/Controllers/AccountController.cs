@@ -3,6 +3,7 @@ using API.Extensions;
 using API.Models;
 using API.Services.IServices;
 using API.Utility;
+using Azure.Messaging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -64,7 +65,7 @@ namespace API.Controllers
 
             if (user == null)
             {
-                return Unauthorized("Invalid username or password");
+                return Unauthorized(new DTOs.ApiResponse(401, message: "Invalid username or password"));
             }
 
             var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
@@ -72,7 +73,7 @@ namespace API.Controllers
             if (!result.Succeeded)
             {
                 RemoveJWTCookie();
-                return Unauthorized("Invalid username or password");
+                return Unauthorized(new DTOs.ApiResponse(401, message:"Invalid username or password"));
 
             }
 
@@ -84,12 +85,12 @@ namespace API.Controllers
         {
             if (await CheckEmailExistsAsync(model.Email))
             {
-                return BadRequest($"An account has been registered with '{model.Email}'.");
+                return BadRequest(new DTOs.ApiResponse(400, message: $"An account has been registered with '{model.Email}'."));
             }
 
             if (await CheckNameExistsAsync(model.Name))
             {
-                return BadRequest($"An account has been registered with '{model.Name}'.");
+                return BadRequest(new DTOs.ApiResponse(400, message:$"An account has been registered with '{model.Name}'."));
             }
 
             var userToAdd = new AppUser
@@ -104,7 +105,7 @@ namespace API.Controllers
             var result = await _userManager.CreateAsync(userToAdd, model.Password);
             if (!result.Succeeded) return BadRequest(result.Errors);
 
-            return Ok("Your account has been created");
+            return Ok(new DTOs.ApiResponse(201, message:"Your account has been created"));
         }
 
         //new -> Create a small object right now, without defining a class for it
@@ -142,7 +143,7 @@ namespace API.Controllers
             if(user == null)
             {
                 RemoveJWTCookie();
-                return Unauthorized();
+                return Unauthorized(new ApiResponse(401));
             }
 
             return Ok(CreateAppUserDto(user));
