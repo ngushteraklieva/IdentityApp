@@ -11,7 +11,7 @@
         public const string Email = "email"; 
 
         //regex
-        public const string UserNameRegex = "^[]a-zA-z0-9_.-]*$";
+        public const string UserNameRegex = "^[a-zA-Z][a-zA-Z0-9]*$";
         public const string EmailRegex = "^.+@[^\\.].*\\.[a-z]{2,}$";
 
         //Application rules

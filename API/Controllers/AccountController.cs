@@ -87,22 +87,37 @@ namespace API.Controllers
                 return BadRequest($"An account has been registered with '{model.Email}'.");
             }
 
-            if (await CheckUsernameExistsAsync(model.UserName))
+            if (await CheckNameExistsAsync(model.Name))
             {
-                return BadRequest($"An account has been registered with '{model.UserName}'.");
+                return BadRequest($"An account has been registered with '{model.Name}'.");
             }
 
             var userToAdd = new AppUser
             {
-                UserName = model.UserName,
+                Name = model.Name,
+                UserName = model.Name.ToLower(),
                 Email = model.Email,
-                EmailConfirmed = true
+                EmailConfirmed = true,
+                LockoutEnabled = true
             };
 
             var result = await _userManager.CreateAsync(userToAdd, model.Password);
             if (!result.Succeeded) return BadRequest(result.Errors);
 
             return Ok("Your account has been created");
+        }
+
+        //new -> Create a small object right now, without defining a class for it
+        [HttpGet("name-taken")]
+        public async Task<IActionResult> NameTaken([FromQuery] string name)
+        {
+            return Ok(new { IsTaken = await CheckNameExistsAsync(name) });
+        }
+
+        [HttpGet("email-taken")]
+        public async Task<IActionResult> EmailTaken([FromQuery] string email)
+        {
+            return Ok(new { IsTaken = await CheckEmailExistsAsync(email) });
         }
 
         [Authorize]
@@ -170,9 +185,9 @@ namespace API.Controllers
             return await _userManager.Users.AnyAsync(x => x.Email == email);
         }
 
-        private async Task<bool> CheckUsernameExistsAsync(string username)
+        private async Task<bool> CheckNameExistsAsync(string name)
         {
-            return await _userManager.Users.AnyAsync(x => x.UserName == username);
+            return await _userManager.Users.AnyAsync(x => x.UserName == name.ToLower());
         }
         #endregion
     }

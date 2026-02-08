@@ -317,3 +317,11 @@ await File.ReadAllTextAsync("file.txt")
 Waiting for:
 disk read
 OS file system
+
+
+13.Get and Set:
+-hide the data, expose a door”
+-Instead of exposing the data directly, we do this:
+-“I will store the value privately, and only let others touch it through controlled access.”
+_email is the box.
+Email is the door to the box.
